@@ -1,4 +1,4 @@
-# continuous-learning-v2
+# homunculus
 
 Claude Code가 세션을 관찰하고, 당신의 **행동·철학·습관**을 atomic "instinct"로 학습하는 시스템.
 
@@ -43,8 +43,8 @@ evolved/skills/, evolved/commands/, evolved/agents/
 ## 설치
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/continuous-learning-v2 ~/.claude/skills/continuous-learning-v2
-cd ~/.claude/skills/continuous-learning-v2
+git clone https://github.com/YOUR_USERNAME/homunculus ~/.claude/skills/homunculus
+cd ~/.claude/skills/homunculus
 bash setup.sh
 ```
 
@@ -87,16 +87,16 @@ Skip disclaimers and qualifications. State the recommendation first, reasoning s
 ### 4. CLI
 
 ```bash
-python3 ~/.claude/skills/continuous-learning-v2/scripts/instinct-cli.py status
-python3 ~/.claude/skills/continuous-learning-v2/scripts/instinct-cli.py export -o my-instincts.yaml
-python3 ~/.claude/skills/continuous-learning-v2/scripts/instinct-cli.py import friend-instincts.yaml
-python3 ~/.claude/skills/continuous-learning-v2/scripts/instinct-cli.py evolve --generate
+python3 ~/.claude/skills/homunculus/scripts/instinct-cli.py status
+python3 ~/.claude/skills/homunculus/scripts/instinct-cli.py export -o my-instincts.yaml
+python3 ~/.claude/skills/homunculus/scripts/instinct-cli.py import friend-instincts.yaml
+python3 ~/.claude/skills/homunculus/scripts/instinct-cli.py evolve --generate
 ```
 
 ## 파일 구조
 
 ```
-~/.claude/skills/continuous-learning-v2/
+~/.claude/skills/homunculus/
 ├── hooks/
 │   └── observe.sh              # PreToolUse/PostToolUse 훅
 ├── agents/
@@ -167,5 +167,5 @@ python3 scripts/instinct-cli.py import https://raw.githubusercontent.com/.../ins
 ## 제거
 
 ```bash
-bash ~/.claude/skills/continuous-learning-v2/uninstall.sh
+bash ~/.claude/skills/homunculus/uninstall.sh
 ```

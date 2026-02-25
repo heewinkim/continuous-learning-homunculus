@@ -1,5 +1,5 @@
 #!/bin/bash
-# continuous-learning-v2 setup script
+# homunculus setup script
 set -e
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,7 +16,7 @@ warn() { echo -e "${YELLOW}!${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
 
 echo ""
-echo "continuous-learning-v2 setup"
+echo "homunculus setup"
 echo "────────────────────────────"
 echo ""
 
