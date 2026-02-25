@@ -153,8 +153,8 @@ Add to your `~/.claude/settings.json`.
 The Python CLI will create these automatically, but you can also create them manually:
 
 ```bash
-mkdir -p ~/.claude/continuous-learning-homunculus/{instincts/{personal,inherited},evolved/{agents,skills,commands}}
-touch ~/.claude/continuous-learning-homunculus/observations.jsonl
+mkdir -p ~/.claude/homunculus/{instincts/{personal,inherited},evolved/{agents,skills,commands}}
+touch ~/.claude/homunculus/observations.jsonl
 ```
 
 ### 3. Use the Instinct Commands
@@ -184,31 +184,40 @@ Edit `config.json`:
   "version": "2.0",
   "observation": {
     "enabled": true,
-    "store_path": "~/.claude/continuous-learning-homunculus/observations.jsonl",
+    "store_path": "~/.claude/homunculus/observations.jsonl",
     "max_file_size_mb": 10,
     "archive_after_days": 7
   },
   "instincts": {
-    "personal_path": "~/.claude/continuous-learning-homunculus/instincts/personal/",
-    "inherited_path": "~/.claude/continuous-learning-homunculus/instincts/inherited/",
-    "min_confidence": 0.3,
-    "auto_approve_threshold": 0.7,
-    "confidence_decay_rate": 0.05
+    "personal_path": "~/.claude/homunculus/instincts/personal/",
+    "inherited_path": "~/.claude/homunculus/instincts/inherited/",
+    "min_confidence": 0.65,
+    "auto_approve_threshold": 0.8,
+    "confidence_decay_rate": 0.02,
+    "max_instincts": 15
   },
   "observer": {
     "enabled": true,
     "model": "haiku",
-    "run_interval_minutes": 5,
+    "trigger_mode": "session_end",
+    "min_observations_to_analyze": 20,
     "patterns_to_detect": [
-      "user_corrections",
-      "error_resolutions",
-      "repeated_workflows",
-      "tool_preferences"
+      "value_corrections",
+      "aesthetic_standards",
+      "decision_philosophy",
+      "communication_preferences",
+      "avoidance_patterns",
+      "curiosity_areas",
+      "work_rhythm",
+      "expression_style",
+      "priority_patterns",
+      "problem_approach"
     ]
   },
   "evolution": {
     "cluster_threshold": 3,
-    "evolved_path": "~/.claude/continuous-learning-homunculus/evolved/"
+    "evolved_path": "~/.claude/homunculus/evolved/",
+    "auto_evolve": false
   }
 }
 ```
@@ -216,17 +225,16 @@ Edit `config.json`:
 ## File Structure
 
 ```
-~/.claude/continuous-learning-homunculus/
-├── identity.json           # Your profile, technical level
-├── observations.jsonl      # Current session observations
-├── observations.archive/   # Processed observations
+~/.claude/homunculus/           # 런타임 데이터 (gitignore됨)
+├── observations.jsonl          # 현재 세션 관찰 데이터
+├── observations.archive/       # 처리된 관찰 데이터
 ├── instincts/
-│   ├── personal/           # Auto-learned instincts
-│   └── inherited/          # Imported from others
+│   ├── personal/               # 자동 학습된 instinct
+│   └── inherited/              # 다른 사람에게서 가져온 instinct
 └── evolved/
-    ├── agents/             # Generated specialist agents
-    ├── skills/             # Generated skills
-    └── commands/           # Generated commands
+    ├── agents/                 # 생성된 전문 에이전트
+    ├── skills/                 # 생성된 스킬
+    └── commands/               # 생성된 커맨드
 ```
 
 ## Integration with Skill Creator
@@ -243,9 +251,10 @@ Confidence evolves over time:
 
 | Score | Meaning | Behavior |
 |-------|---------|----------|
-| 0.3 | Tentative | Suggested but not enforced |
-| 0.5 | Moderate | Applied when relevant |
-| 0.7 | Strong | Auto-approved for application |
+| < 0.65 | Insufficient | Not written — below creation threshold |
+| 0.65 | Tentative | Created cautiously, needs reinforcement |
+| 0.7 | Moderate | Applied when relevant |
+| 0.8 | Strong | Auto-approved for application |
 | 0.9 | Near-certain | Core behavior |
 
 **Confidence increases** when:

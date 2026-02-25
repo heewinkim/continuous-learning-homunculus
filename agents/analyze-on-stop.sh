@@ -49,48 +49,100 @@ if ! command -v claude &> /dev/null; then
   exit 1
 fi
 
-PROMPT="Read the observations file at $OBSERVATIONS_FILE. Your goal is NOT to catalog what tools were used — it is to understand the person behind the session: their values, philosophy, habits, and character.
+# Read observations content directly (avoid needing Read tool permission)
+OBS_CONTENT=$(head -c 40000 "$OBSERVATIONS_FILE" 2>/dev/null)
+TODAY=$(date +%Y-%m-%d)
 
-Look for these human-centered patterns:
+# Build existing instincts summary with full content for merging decisions
+EXISTING_INSTINCTS=""
+INSTINCT_COUNT=0
+MAX_INSTINCTS=15
+if [ -d "$INSTINCTS_DIR" ]; then
+  for f in "$INSTINCTS_DIR"/*.md; do
+    [ -f "$f" ] || continue
+    INSTINCT_COUNT=$((INSTINCT_COUNT + 1))
+    fname=$(basename "$f" .md)
+    summary=$(head -10 "$f" | grep -E "^(id|confidence|trigger):" | tr '\n' ' ')
+    EXISTING_INSTINCTS="${EXISTING_INSTINCTS}- $fname: $summary\n"
+  done
+fi
 
-- value_corrections: moments the user said 'no', pushed back, or redirected — what principle or value was being asserted?
-- aesthetic_standards: what does 'good' look like to this person? what did they accept vs. reject based on how something felt or looked?
-- decision_philosophy: when faced with choices, what principles consistently guide them? (e.g. simplicity over completeness, speed over perfection)
-- communication_preferences: how do they want to be spoken to? what tone, depth, and style do they respond well to?
-- avoidance_patterns: what do they consistently not want? what makes them say 'no' or 'stop'?
-- curiosity_areas: what topics or domains keep pulling their attention? what do they keep coming back to?
-- work_rhythm: how do they naturally pace themselves? what does their working style look like?
-- expression_style: how do they phrase things? what vocabulary, energy, or register do they use?
-- priority_patterns: what do they consistently treat as most important when there is tension between options?
-- problem_approach: when something is hard or broken, how do they characteristically respond?
+if [ -z "$EXISTING_INSTINCTS" ]; then
+  EXISTING_INSTINCTS="(none yet)"
+fi
 
-For each clear pattern (2+ signals), create a file in $INSTINCTS_DIR/ named with a short kebab-case id.
+# Capacity state for prompt
+if [ "$INSTINCT_COUNT" -ge "$MAX_INSTINCTS" ]; then
+  CAPACITY_NOTE="CAPACITY REACHED ($INSTINCT_COUNT/$MAX_INSTINCTS). Do NOT create new files. You may only UPDATE existing files or use the Bash tool to delete redundant ones (rm $INSTINCTS_DIR/<id>.md) before merging."
+else
+  REMAINING=$((MAX_INSTINCTS - INSTINCT_COUNT))
+  CAPACITY_NOTE="Capacity: $INSTINCT_COUNT/$MAX_INSTINCTS instincts used. At most $REMAINING new files allowed — use slots sparingly."
+fi
 
-File format:
+PROMPT="AUTOMATED INSTINCT EXTRACTION TASK.
+CRITICAL: Do NOT ask any questions. Do NOT ask for permission. Do NOT offer choices.
+Immediately analyze and act. No conversation.
+
+Here are the observations from a Claude Code session (JSON lines):
+
+---OBSERVATIONS START---
+$OBS_CONTENT
+---OBSERVATIONS END---
+
+---EXISTING INSTINCTS---
+$EXISTING_INSTINCTS
+---END EXISTING INSTINCTS---
+
+$CAPACITY_NOTE
+
+## Philosophy: Simple is Best
+A small set of deep, accurate instincts is far more valuable than many shallow ones.
+Resist the urge to create. Default to doing nothing unless the signal is unmistakably clear.
+
+## What to look for (human character, not tool mechanics)
+- Moments the user pushed back, corrected, or said no — what value was being defended?
+- What they consistently accept vs. reject — aesthetic or philosophical standard
+- How they communicate — tone, directness, depth they respond well to
+- What they avoid or find annoying
+- How they approach hard problems
+
+## Strict rules
+1. **Threshold: 0.65 minimum confidence.** One-off signals don't qualify. Skip if uncertain.
+2. **Merge first.** If a new signal reinforces an existing instinct, UPDATE that file (raise confidence, add to evidence). Do not create a duplicate.
+3. **Consolidate when possible.** If two existing instincts overlap significantly, DELETE the weaker one (Bash: rm) and fold it into the stronger one.
+4. **Create only when genuinely novel** — a pattern clearly not covered by any existing instinct.
+5. **No tool-use noise.** 'Used Bash frequently' is not an instinct. Focus on character.
+6. **When in doubt, do nothing.** Silence is better than a weak instinct.
+
+## File format (for new or updated files)
+Write to $INSTINCTS_DIR/<kebab-case-id>.md:
 ---
 id: <kebab-case-id>
-trigger: \"<the situation where this applies>\"
-confidence: <0.3-0.85>
-domain: \"<one of: values, aesthetics, philosophy, communication, habits, curiosity, rhythm, expression>\"
+trigger: \"<one specific situation>\"
+confidence: <0.65-0.9>
+domain: \"<values|aesthetics|philosophy|communication|habits|curiosity|rhythm|expression>\"
 source: \"session-observation\"
 ---
 
-# <Title>
+# <Short, specific title>
 
 ## Insight
-<One sentence describing what this reveals about the person — not what to do, but who they are>
+<One sentence — who they are, not what to do>
 
 ## In Practice
-<How this should shape behavior when interacting with them>
+<One to two sentences — how to act on this>
 
 ## Evidence
-- Observed <N> times
-- Last observed: $(date +%Y-%m-%d)
+- Observed <N> times across sessions
+- Last observed: $TODAY
 
-Be honest and specific. Avoid generic observations. If a similar instinct already exists, deepen it rather than duplicate it."
+모든 파일 내용(Insight, In Practice, Evidence 포함)은 **한국어**로 작성할 것. id와 frontmatter 필드값(kebab-case id, domain 값 등)만 영어 유지.
+
+BEGIN NOW. Less is more."
 
 exit_code=0
-claude --model haiku --max-turns 15 --print "$PROMPT" >> "$LOG_FILE" 2>&1 || exit_code=$?
+unset CLAUDECODE
+claude --model haiku --max-turns 15 --dangerously-skip-permissions --print "$PROMPT" >> "$LOG_FILE" 2>&1 || exit_code=$?
 
 if [ "$exit_code" -eq 0 ]; then
   echo "[$(date)] Analysis complete." >> "$LOG_FILE"

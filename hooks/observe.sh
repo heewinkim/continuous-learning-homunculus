@@ -36,7 +36,7 @@
 
 set -e
 
-CONFIG_DIR="${HOME}/.claude/continuous-learning-homunculus"
+CONFIG_DIR="${HOME}/.claude/homunculus"
 OBSERVATIONS_FILE="${CONFIG_DIR}/observations.jsonl"
 MAX_FILE_SIZE_MB=10
 
