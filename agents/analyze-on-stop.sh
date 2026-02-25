@@ -79,82 +79,127 @@ else
   CAPACITY_NOTE="Capacity: $INSTINCT_COUNT/$MAX_INSTINCTS instincts used. At most $REMAINING new files allowed — use slots sparingly."
 fi
 
-PROMPT="AUTOMATED INSTINCT EXTRACTION TASK.
-CRITICAL: Do NOT ask any questions. Do NOT ask for permission. Do NOT offer choices.
-Immediately analyze and act. No conversation.
+PROMPT="You are an instinct extractor. Analyze the observations below and output instinct file blocks.
 
-Here are the observations from a Claude Code session (JSON lines):
-
----OBSERVATIONS START---
+OBSERVATIONS (JSON lines from a Claude Code session):
+---
 $OBS_CONTENT
----OBSERVATIONS END---
+---
 
----EXISTING INSTINCTS---
+EXISTING INSTINCTS (already learned — check before creating):
+---
 $EXISTING_INSTINCTS
----END EXISTING INSTINCTS---
+---
 
 $CAPACITY_NOTE
 
-## Philosophy: Simple is Best
-A small set of deep, accurate instincts is far more valuable than many shallow ones.
-Resist the urge to create. Default to doing nothing unless the signal is unmistakably clear.
+## Philosophy
+A small set of deep, accurate instincts beats many shallow ones.
+When in doubt, output nothing.
 
 ## What to look for (human character, not tool mechanics)
-- Moments the user pushed back, corrected, or said no — what value was being defended?
-- What they consistently accept vs. reject — aesthetic or philosophical standard
-- How they communicate — tone, directness, depth they respond well to
-- What they avoid or find annoying
+- Moments the user pushed back, corrected, or said no — what value was defended?
+- What they consistently accept vs. reject
+- How they prefer to communicate — tone, directness, depth
+- What they consistently avoid or dislike
 - How they approach hard problems
 
-## Strict rules
-1. **Threshold: 0.65 minimum confidence.** One-off signals don't qualify. Skip if uncertain.
-2. **Merge first.** If a new signal reinforces an existing instinct, UPDATE that file (raise confidence, add to evidence). Do not create a duplicate.
-3. **Consolidate when possible.** If two existing instincts overlap significantly, DELETE the weaker one (Bash: rm) and fold it into the stronger one.
-4. **Create only when genuinely novel** — a pattern clearly not covered by any existing instinct.
-5. **No tool-use noise.** 'Used Bash frequently' is not an instinct. Focus on character.
-6. **When in doubt, do nothing.** Silence is better than a weak instinct.
+## Rules
+1. Minimum confidence 0.65. Skip weak or one-off signals.
+2. If a signal reinforces an existing instinct, output an updated version of that file.
+3. Only output a new file if the pattern is clearly not covered by existing instincts.
+4. No tool-use noise ('used Bash a lot' is not an instinct).
+5. If nothing qualifies, output exactly: NO_INSTINCTS
 
-## File format (for new or updated files)
-Write to $INSTINCTS_DIR/<kebab-case-id>.md:
+## Output format
+For each instinct (new or updated), output a block like this — nothing else:
+
+<<<FILE:kebab-case-id.md>>>
 ---
-id: <kebab-case-id>
-trigger: \"<one specific situation>\"
-confidence: <0.65-0.9>
-domain: \"<values|aesthetics|philosophy|communication|habits|curiosity|rhythm|expression>\"
+id: kebab-case-id
+trigger: \"one specific situation\"
+confidence: 0.65-0.9
+domain: \"values|aesthetics|philosophy|communication|habits|curiosity|rhythm|expression\"
 source: \"session-observation\"
 ---
 
-# <Short, specific title>
+# 제목 (한국어)
 
 ## Insight
-<One sentence — who they are, not what to do>
+한 문장 — 이 사람이 어떤 사람인지 (무엇을 해야 하는지 X)
 
 ## In Practice
-<One to two sentences — how to act on this>
+한두 문장 — 이 인사이트를 어떻게 적용하는지
 
 ## Evidence
-- Observed <N> times across sessions
-- Last observed: $TODAY
+- $TODAY 기준 N회 관찰
+<<<END>>>
 
-모든 파일 내용(Insight, In Practice, Evidence 포함)은 **한국어**로 작성할 것. id와 frontmatter 필드값(kebab-case id, domain 값 등)만 영어 유지.
+Output ONLY the <<<FILE>>>...<<<END>>> blocks or NO_INSTINCTS. No explanation, no commentary."
 
-BEGIN NOW. Less is more."
-
-exit_code=0
+# Run analysis and capture output
 unset CLAUDECODE
-claude --model haiku --max-turns 15 --dangerously-skip-permissions --print "$PROMPT" >> "$LOG_FILE" 2>&1 || exit_code=$?
+ANALYSIS_OUTPUT=$(claude --model haiku --max-turns 3 --print "$PROMPT" 2>&1)
+exit_code=$?
 
-if [ "$exit_code" -eq 0 ]; then
+echo "[$(date)] Claude output captured (${#ANALYSIS_OUTPUT} chars)" >> "$LOG_FILE"
+
+if [ "$exit_code" -ne 0 ]; then
+  echo "[$(date)] Analysis failed (exit $exit_code): $ANALYSIS_OUTPUT" >> "$LOG_FILE"
+  exit 0
+fi
+
+# Check if no instincts found
+if echo "$ANALYSIS_OUTPUT" | grep -q "^NO_INSTINCTS"; then
+  echo "[$(date)] No qualifying instincts found." >> "$LOG_FILE"
+  date +%s > "$LAST_ANALYZED_FILE"
+  archive_dir="${CONFIG_DIR}/observations.archive"
+  mkdir -p "$archive_dir"
+  mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S).jsonl" 2>/dev/null || true
+  touch "$OBSERVATIONS_FILE"
+  exit 0
+fi
+
+# Parse output and write instinct files
+FILES_WRITTEN=$(echo "$ANALYSIS_OUTPUT" | python3 -c "
+import sys, os, re
+
+output = sys.stdin.read()
+instincts_dir = '$INSTINCTS_DIR'
+os.makedirs(instincts_dir, exist_ok=True)
+
+pattern = r'<<<FILE:(.+?)>>>(.*?)<<<END>>>'
+matches = re.findall(pattern, output, re.DOTALL)
+
+count = 0
+for filename, content in matches:
+    filename = filename.strip()
+    content = content.strip()
+    if not filename.endswith('.md'):
+        filename += '.md'
+    filepath = os.path.join(instincts_dir, filename)
+    with open(filepath, 'w') as f:
+        f.write(content + '\n')
+    print(f'Written: {filename}')
+    count += 1
+
+if count == 0:
+    print('No FILE blocks found in output')
+    sys.exit(1)
+" 2>&1)
+
+parse_exit=$?
+echo "[$(date)] $FILES_WRITTEN" >> "$LOG_FILE"
+
+if [ $parse_exit -eq 0 ]; then
   echo "[$(date)] Analysis complete." >> "$LOG_FILE"
   date +%s > "$LAST_ANALYZED_FILE"
-
-  # Archive processed observations
   archive_dir="${CONFIG_DIR}/observations.archive"
   mkdir -p "$archive_dir"
   mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S).jsonl" 2>/dev/null || true
   touch "$OBSERVATIONS_FILE"
 else
-  echo "[$(date)] Analysis failed (exit $exit_code)" >> "$LOG_FILE"
+  echo "[$(date)] Parse failed. Raw output: ${ANALYSIS_OUTPUT:0:500}" >> "$LOG_FILE"
 fi
 
 exit 0
