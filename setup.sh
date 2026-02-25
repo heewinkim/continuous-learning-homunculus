@@ -1,5 +1,5 @@
 #!/bin/bash
-# homunculus setup script
+# continuous-learning-homunculus setup script
 set -e
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,7 +16,7 @@ warn() { echo -e "${YELLOW}!${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
 
 echo ""
-echo "homunculus setup"
+echo "continuous-learning-homunculus setup"
 echo "────────────────────────────"
 echo ""
 
@@ -34,7 +34,7 @@ chmod +x "$SKILL_DIR/agents/analyze-on-stop.sh"
 chmod +x "$SKILL_DIR/agents/start-observer.sh"
 ok "스크립트 실행 권한 설정 완료"
 
-# ── Create homunculus directory structure ──────────────────────────────────
+# ── Create continuous-learning-homunculus directory structure ──────────────────────────────────
 
 mkdir -p \
   "$HOMUNCULUS_DIR/instincts/personal" \

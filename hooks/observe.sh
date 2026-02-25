@@ -11,11 +11,11 @@
 #   "hooks": {
 #     "PreToolUse": [{
 #       "matcher": "*",
-#       "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/skills/homunculus/hooks/observe.sh pre" }]
+#       "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-homunculus/hooks/observe.sh pre" }]
 #     }],
 #     "PostToolUse": [{
 #       "matcher": "*",
-#       "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/skills/homunculus/hooks/observe.sh post" }]
+#       "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-homunculus/hooks/observe.sh post" }]
 #     }]
 #   }
 # }
@@ -25,18 +25,18 @@
 #   "hooks": {
 #     "PreToolUse": [{
 #       "matcher": "*",
-#       "hooks": [{ "type": "command", "command": "~/.claude/skills/homunculus/hooks/observe.sh pre" }]
+#       "hooks": [{ "type": "command", "command": "~/.claude/skills/continuous-learning-homunculus/hooks/observe.sh pre" }]
 #     }],
 #     "PostToolUse": [{
 #       "matcher": "*",
-#       "hooks": [{ "type": "command", "command": "~/.claude/skills/homunculus/hooks/observe.sh post" }]
+#       "hooks": [{ "type": "command", "command": "~/.claude/skills/continuous-learning-homunculus/hooks/observe.sh post" }]
 #     }]
 #   }
 # }
 
 set -e
 
-CONFIG_DIR="${HOME}/.claude/homunculus"
+CONFIG_DIR="${HOME}/.claude/continuous-learning-homunculus"
 OBSERVATIONS_FILE="${CONFIG_DIR}/observations.jsonl"
 MAX_FILE_SIZE_MB=10
 

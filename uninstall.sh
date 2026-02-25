@@ -1,5 +1,5 @@
 #!/bin/bash
-# homunculus uninstall script
+# continuous-learning-homunculus uninstall script
 set -e
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,7 +12,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 echo ""
-echo "homunculus uninstall"
+echo "continuous-learning-homunculus uninstall"
 echo "─────────────────────────────────"
 echo ""
 

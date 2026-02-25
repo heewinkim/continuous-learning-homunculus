@@ -1,5 +1,5 @@
 ---
-name: homunculus
+name: continuous-learning-homunculus
 description: Instinct-based learning system that observes sessions via hooks, creates atomic instincts with confidence scoring, and evolves them into skills/commands/agents.
 version: 2.0.0
 ---
@@ -111,14 +111,14 @@ Add to your `~/.claude/settings.json`.
       "matcher": "*",
       "hooks": [{
         "type": "command",
-        "command": "${CLAUDE_PLUGIN_ROOT}/skills/homunculus/hooks/observe.sh pre"
+        "command": "${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-homunculus/hooks/observe.sh pre"
       }]
     }],
     "PostToolUse": [{
       "matcher": "*",
       "hooks": [{
         "type": "command",
-        "command": "${CLAUDE_PLUGIN_ROOT}/skills/homunculus/hooks/observe.sh post"
+        "command": "${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-homunculus/hooks/observe.sh post"
       }]
     }]
   }
@@ -134,14 +134,14 @@ Add to your `~/.claude/settings.json`.
       "matcher": "*",
       "hooks": [{
         "type": "command",
-        "command": "~/.claude/skills/homunculus/hooks/observe.sh pre"
+        "command": "~/.claude/skills/continuous-learning-homunculus/hooks/observe.sh pre"
       }]
     }],
     "PostToolUse": [{
       "matcher": "*",
       "hooks": [{
         "type": "command",
-        "command": "~/.claude/skills/homunculus/hooks/observe.sh post"
+        "command": "~/.claude/skills/continuous-learning-homunculus/hooks/observe.sh post"
       }]
     }]
   }
@@ -153,8 +153,8 @@ Add to your `~/.claude/settings.json`.
 The Python CLI will create these automatically, but you can also create them manually:
 
 ```bash
-mkdir -p ~/.claude/homunculus/{instincts/{personal,inherited},evolved/{agents,skills,commands}}
-touch ~/.claude/homunculus/observations.jsonl
+mkdir -p ~/.claude/continuous-learning-homunculus/{instincts/{personal,inherited},evolved/{agents,skills,commands}}
+touch ~/.claude/continuous-learning-homunculus/observations.jsonl
 ```
 
 ### 3. Use the Instinct Commands
@@ -184,13 +184,13 @@ Edit `config.json`:
   "version": "2.0",
   "observation": {
     "enabled": true,
-    "store_path": "~/.claude/homunculus/observations.jsonl",
+    "store_path": "~/.claude/continuous-learning-homunculus/observations.jsonl",
     "max_file_size_mb": 10,
     "archive_after_days": 7
   },
   "instincts": {
-    "personal_path": "~/.claude/homunculus/instincts/personal/",
-    "inherited_path": "~/.claude/homunculus/instincts/inherited/",
+    "personal_path": "~/.claude/continuous-learning-homunculus/instincts/personal/",
+    "inherited_path": "~/.claude/continuous-learning-homunculus/instincts/inherited/",
     "min_confidence": 0.3,
     "auto_approve_threshold": 0.7,
     "confidence_decay_rate": 0.05
@@ -208,7 +208,7 @@ Edit `config.json`:
   },
   "evolution": {
     "cluster_threshold": 3,
-    "evolved_path": "~/.claude/homunculus/evolved/"
+    "evolved_path": "~/.claude/continuous-learning-homunculus/evolved/"
   }
 }
 ```
@@ -216,7 +216,7 @@ Edit `config.json`:
 ## File Structure
 
 ```
-~/.claude/homunculus/
+~/.claude/continuous-learning-homunculus/
 ├── identity.json           # Your profile, technical level
 ├── observations.jsonl      # Current session observations
 ├── observations.archive/   # Processed observations
@@ -284,7 +284,7 @@ v2 is fully compatible with v1:
 ## Related
 
 - [Skill Creator](https://skill-creator.app) - Generate instincts from repo history
-- [Homunculus](https://github.com/humanplane/homunculus) - Inspiration for v2 architecture
+- [Homunculus](https://github.com/humanplane/continuous-learning-homunculus) - Inspiration for v2 architecture
 - [The Longform Guide](https://x.com/affaanmustafa/status/2014040193557471352) - Continuous learning section
 
 ---
