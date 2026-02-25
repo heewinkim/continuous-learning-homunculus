@@ -43,7 +43,7 @@ evolved/skills/, evolved/commands/, evolved/agents/
 ## 설치
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/continuous-learning-homunculus ~/.claude/skills/continuous-learning-homunculus
+git clone https://github.com/heewinkim/continuous-learning-homunculus ~/.claude/skills/continuous-learning-homunculus
 cd ~/.claude/skills/continuous-learning-homunculus
 bash setup.sh
 ```
