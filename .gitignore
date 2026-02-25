@@ -1,0 +1,10 @@
+# Runtime data — never commit
+*.jsonl
+*.log
+.last_analyzed
+.observer.pid
+*.swp
+*.swo
+
+# macOS
+.DS_Store
