@@ -49,3 +49,41 @@ analyze-on-stop.sh
 
 - `c28c774` feat: Claude Haiku semantic clustering for evolve + auto-evolve on session end
 - `5bc6a5a` feat: setup/uninstall now manages /evolve slash command
+
+---
+
+## 2026-03-07 — apply 커맨드 + rule 진화 타입 추가
+
+### 변경 내용
+
+#### 흐름 재설계
+- evolved/ 폴더는 자동 스테이징 영역
+- `/evolve` 슬래시 커맨드: staged 항목 목록 보여주고 apply 안내 (분석·생성 역할 제거)
+- `apply` CLI 커맨드: 터미널에서 직접 실행, 항목별 y/n 선택 후 `~/.claude/`에 배포
+
+#### `scripts/instinct-cli.py`
+- `cmd_apply()` 추가 — evolved/ 하위 skills/commands/agents/rules 스캔, 항목별 y/n 선택 적용
+  - `--list`: 목록만 출력
+  - `--force`: 이미 적용된 항목도 재선택 가능
+- `rule` 타입 지원 추가 (클러스터링 프롬프트 + `_generate_evolved_v2`)
+- `_claude_update_rule()` 추가 — 기존 `~/.claude/rules/` 파일 읽어 병합·업데이트 (추가 아님)
+  - "simple is best" 원칙: 최대 10줄, 권장 3~5줄
+  - 모순 신호 → 더 강한 쪽으로 업데이트
+- `CLAUDE_RULES_DIR` 모듈 레벨 추가
+- `evolved/rules/` 디렉토리 초기화 추가
+
+#### `commands/evolve.md`
+- staged 항목 확인 + apply 안내로 역할 변경 (기존 분석·생성 흐름 제거)
+
+#### `setup.sh`
+- `evolved/rules/` 디렉토리 생성 추가
+- CLI 사용법 메시지 apply 반영
+
+#### `README.md` / `SKILL.md`
+- 흐름도 업데이트 (staged → apply → ~/.claude/)
+- rule 타입 설명 추가
+- CLI 예시 업데이트
+
+### 커밋
+
+- `(이번 세션)` feat: apply command + rule evolution type with simple-is-best principle

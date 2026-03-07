@@ -14,7 +14,7 @@ An advanced learning system that turns your Claude Code sessions into reusable k
 - Configuring instinct-based behavior extraction via hooks
 - Tuning confidence thresholds for learned behaviors
 - Reviewing, exporting, or importing instinct libraries
-- Evolving instincts into full skills, commands, or agents
+- Evolving instincts into full skills, commands, agents, or rules
 
 ## What's New in v2
 
@@ -25,7 +25,8 @@ An advanced learning system that turns your Claude Code sessions into reusable k
 | Granularity | Full skills | Atomic "instincts" |
 | Confidence | None | 0.3-0.9 weighted |
 | Clustering | String matching | Claude Haiku semantic clustering |
-| Evolution | Manual | Auto on session end (auto_evolve: true) |
+| Evolution | Manual | Auto staging on session end; manual apply via /evolve |
+| Evolution targets | skill/command/agent | + rule (updates existing ~/.claude/rules/) |
 | Sharing | None | Export/import instincts |
 
 ## The Instinct Model
@@ -94,7 +95,12 @@ Session Activity
 │   • commands/new-feature.md             │
 │   • skills/testing-workflow.md          │
 │   • agents/refactor-specialist.md       │
+│   • rules/develop-philosophy.md         │
 └─────────────────────────────────────────┘
+      │
+      │ /evolve → apply (선택 적용)
+      ▼
+~/.claude/skills|commands|agents|rules/
 ```
 
 ## Quick Start

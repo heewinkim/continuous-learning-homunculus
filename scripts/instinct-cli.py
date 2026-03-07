@@ -31,8 +31,10 @@ INHERITED_DIR = INSTINCTS_DIR / "inherited"
 EVOLVED_DIR = HOMUNCULUS_DIR / "evolved"
 OBSERVATIONS_FILE = HOMUNCULUS_DIR / "observations.jsonl"
 
+CLAUDE_RULES_DIR = Path.home() / ".claude" / "rules"
+
 # Ensure directories exist
-for d in [PERSONAL_DIR, INHERITED_DIR, EVOLVED_DIR / "skills", EVOLVED_DIR / "commands", EVOLVED_DIR / "agents"]:
+for d in [PERSONAL_DIR, INHERITED_DIR, EVOLVED_DIR / "skills", EVOLVED_DIR / "commands", EVOLVED_DIR / "agents", EVOLVED_DIR / "rules"]:
     d.mkdir(parents=True, exist_ok=True)
 
 
@@ -391,6 +393,7 @@ type rules:
 - skill: reusable knowledge/approach pattern (2+ instincts)
 - command: a workflow that can be invoked as a slash command
 - agent: complex specialization requiring 3+ high-confidence instincts
+- rule: a core behavioral principle about the user's values/philosophy/communication style (2+ high-confidence instincts). Will UPDATE existing rules, not add new ones.
 
 If no meaningful clusters exist, return {{"clusters": []}}"""
 
@@ -437,6 +440,48 @@ If no meaningful clusters exist, return {{"clusters": []}}"""
         })
 
     return clusters
+
+
+def _claude_update_rule(name: str, theme: str, instincts: list, existing_content: str) -> str:
+    """Use Claude Haiku to generate or update a rule file, merging existing content with new instincts."""
+    import subprocess
+
+    instinct_lines = '\n'.join(
+        f"- {i.get('trigger', i.get('id', ''))}: {i.get('content', '')[:200]}"
+        for i in instincts
+    )
+
+    existing_section = f"EXISTING RULE CONTENT:\n---\n{existing_content}\n---\n" if existing_content else "EXISTING RULE CONTENT: (none — create new)\n"
+
+    prompt = f"""You are updating a Claude Code rule file.
+
+{existing_section}
+NEW INSTINCTS TO INCORPORATE:
+{instinct_lines}
+
+Write an updated rule file for "{name}" ({theme}).
+
+STRICT PRINCIPLES:
+- Simple is best. Fewer rules = higher accuracy.
+- Keep only the most essential, actionable principles.
+- If new instincts contradict existing rules, update the rule to reflect the stronger signal.
+- If new instincts reinforce existing rules, keep the rule concise — do not add redundant lines.
+- Maximum 10 lines of actual content. Prefer 3-5.
+- Output ONLY the raw markdown content of the rule file. No explanation."""
+
+    env = {**os.environ}
+    env.pop('CLAUDECODE', None)
+
+    try:
+        result = subprocess.run(
+            ['claude', '--model', 'haiku', '--max-turns', '1', '--print', prompt],
+            capture_output=True, text=True, env=env, timeout=60
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return existing_content  # fallback: keep existing
+
+    output = result.stdout.strip()
+    return output if output else existing_content
 
 
 # ─────────────────────────────────────────────
@@ -570,6 +615,15 @@ def _generate_evolved_v2(clusters: list) -> list[str]:
             agent_file.write_text(content)
             generated.append(str(agent_file))
 
+        elif ctype == 'rule':
+            rule_file = EVOLVED_DIR / "rules" / f"{name}.md"
+            existing_rule = CLAUDE_RULES_DIR / f"{name}.md"
+            existing_content = existing_rule.read_text() if existing_rule.exists() else ""
+            print(f"  규칙 업데이트 중: {name} ({'기존 규칙 병합' if existing_content else '신규 생성'})...")
+            updated = _claude_update_rule(name, theme, inst_list, existing_content)
+            rule_file.write_text(updated)
+            generated.append(str(rule_file))
+
     return generated
 
 
@@ -652,6 +706,139 @@ def _generate_evolved(skill_candidates: list, workflow_instincts: list, agent_ca
 
 
 # ─────────────────────────────────────────────
+# Apply Command
+# ─────────────────────────────────────────────
+
+CLAUDE_DIR = Path.home() / ".claude"
+
+APPLY_TARGETS = {
+    "skill":   (EVOLVED_DIR / "skills",   CLAUDE_DIR / "skills"),
+    "command": (EVOLVED_DIR / "commands", CLAUDE_DIR / "commands"),
+    "agent":   (EVOLVED_DIR / "agents",   CLAUDE_DIR / "agents"),
+}
+
+
+def cmd_apply(args):
+    """Show evolved items and selectively apply them to ~/.claude/."""
+    candidates = []
+
+    # skills: each subdirectory with SKILL.md
+    evolved_skills = EVOLVED_DIR / "skills"
+    if evolved_skills.exists():
+        for skill_dir in sorted(evolved_skills.iterdir()):
+            skill_file = skill_dir / "SKILL.md"
+            if skill_dir.is_dir() and skill_file.exists():
+                dest = CLAUDE_DIR / "skills" / skill_dir.name / "SKILL.md"
+                candidates.append({
+                    "type": "skill",
+                    "name": skill_dir.name,
+                    "src": skill_file,
+                    "dest": dest,
+                    "applied": dest.exists(),
+                })
+
+    # commands: .md files
+    evolved_commands = EVOLVED_DIR / "commands"
+    if evolved_commands.exists():
+        for cmd_file in sorted(evolved_commands.glob("*.md")):
+            dest = CLAUDE_DIR / "commands" / cmd_file.name
+            candidates.append({
+                "type": "command",
+                "name": cmd_file.stem,
+                "src": cmd_file,
+                "dest": dest,
+                "applied": dest.exists(),
+            })
+
+    # agents: .md files
+    evolved_agents = EVOLVED_DIR / "agents"
+    if evolved_agents.exists():
+        for agent_file in sorted(evolved_agents.glob("*.md")):
+            dest = CLAUDE_DIR / "agents" / agent_file.name
+            candidates.append({
+                "type": "agent",
+                "name": agent_file.stem,
+                "src": agent_file,
+                "dest": dest,
+                "applied": dest.exists(),
+            })
+
+    # rules: .md files → ~/.claude/rules/ (update, not add)
+    evolved_rules = EVOLVED_DIR / "rules"
+    if evolved_rules.exists():
+        for rule_file in sorted(evolved_rules.glob("*.md")):
+            dest = CLAUDE_RULES_DIR / rule_file.name
+            candidates.append({
+                "type": "rule",
+                "name": rule_file.stem,
+                "src": rule_file,
+                "dest": dest,
+                "applied": dest.exists(),
+                "is_update": dest.exists(),
+            })
+
+    if not candidates:
+        print("No evolved items found. Run 'evolve --generate' first.")
+        return 1
+
+    print(f"\n{'='*60}")
+    print(f"  EVOLVED ITEMS — {len(candidates)} total")
+    print(f"{'='*60}\n")
+
+    for i, c in enumerate(candidates, 1):
+        if c["type"] == "rule":
+            status = "[UPDATE existing rule]" if c.get("is_update") else "[NEW rule]"
+        else:
+            status = "[already applied]" if c["applied"] else "[not applied]"
+        print(f"  {i}. [{c['type']}] {c['name']}  {status}")
+        # Show first non-empty content line as description
+        try:
+            for line in c["src"].read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith('#') and not line.startswith('---') and ':' not in line[:20]:
+                    print(f"     → {line[:80]}")
+                    break
+        except Exception:
+            pass
+        print()
+
+    if args.list:
+        return 0
+
+    print("각 항목을 적용할지 선택해줘. (y=적용, n=건너뜀, q=종료)\n")
+
+    applied = []
+    for c in candidates:
+        tag = f"[{c['type']}] {c['name']}"
+        if c["applied"] and not args.force:
+            print(f"  {tag} → 이미 적용됨, 건너뜀 (--force로 덮어쓸 수 있어)")
+            continue
+
+        try:
+            answer = input(f"  {tag} 적용? [y/N/q] ").strip().lower()
+        except EOFError:
+            answer = 'n'
+
+        if answer == 'q':
+            print("중단.")
+            break
+        if answer != 'y':
+            continue
+
+        c["dest"].parent.mkdir(parents=True, exist_ok=True)
+        import shutil
+        shutil.copy2(c["src"], c["dest"])
+        print(f"  ✓ {c['dest']}")
+        applied.append(c)
+
+    print(f"\n적용 완료: {len(applied)}개")
+    if applied:
+        print("다음 Claude Code 세션부터 반영돼!")
+    print()
+    return 0
+
+
+# ─────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────
 
@@ -679,6 +866,11 @@ def main():
     evolve_parser = subparsers.add_parser('evolve', help='Analyze and evolve instincts')
     evolve_parser.add_argument('--generate', action='store_true', help='Generate evolved structures')
 
+    # Apply
+    apply_parser = subparsers.add_parser('apply', help='Selectively apply evolved items to ~/.claude/')
+    apply_parser.add_argument('--list', action='store_true', help='Just list, do not prompt')
+    apply_parser.add_argument('--force', action='store_true', help='Re-apply already applied items')
+
     args = parser.parse_args()
 
     if args.command == 'status':
@@ -689,6 +881,8 @@ def main():
         return cmd_export(args)
     elif args.command == 'evolve':
         return cmd_evolve(args)
+    elif args.command == 'apply':
+        return cmd_apply(args)
     else:
         parser.print_help()
         return 1

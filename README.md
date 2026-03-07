@@ -18,9 +18,13 @@ instincts/personal/
     ├── values-simplicity-in-design.md   (confidence: 0.7)
     └── dislikes-over-explanation.md     (confidence: 0.65)
     │
-    │  /evolve
+    │  세션 종료 시 자동 evolve (스테이징)
     ▼
-evolved/skills/, evolved/commands/, evolved/agents/
+evolved/skills/, evolved/commands/, evolved/agents/, evolved/rules/
+    │
+    │  /evolve (선택 적용)
+    ▼
+~/.claude/skills|commands|agents|rules/
 ```
 
 ## 무엇을 배우는가
@@ -60,9 +64,9 @@ Stop 훅이 세션 종료를 감지하면 `analyze-on-stop.sh`가 실행된다. 
 
 24/7 백그라운드 데몬 없음 — 일하지 않는 시간엔 아무것도 실행되지 않는다.
 
-### 3. 자동 Evolve (세션 종료 시, instinct 생성 직후)
+### 3. 자동 Evolve 스테이징 (세션 종료 시, instinct 생성 직후)
 
-instinct 분석 완료 후 자동으로 `evolve --generate`가 실행된다. Claude Haiku가 의미론적으로 관련 instinct들을 클러스터링하여 skill/command/agent 파일을 생성한다.
+instinct 분석 완료 후 자동으로 `evolve --generate`가 실행된다. Claude Haiku가 의미론적으로 관련 instinct들을 클러스터링하여 `~/.claude/homunculus/evolved/` 에 스테이징한다. skill / command / agent 외에 **rule** 타입도 지원하며, rule은 기존 `~/.claude/rules/` 파일을 읽어 업데이트(추가 아님)한다.
 
 ### 3. Instinct 파일
 
@@ -92,12 +96,14 @@ Skip disclaimers and qualifications. State the recommendation first, reasoning s
 
 ```bash
 python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py status
+python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py apply          # staged 항목 y/n 선택 후 적용
+python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py apply --list   # 목록만 보기
+python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py apply --force  # 이미 적용된 것도 재선택
 python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py export -o my-instincts.yaml
 python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py import friend-instincts.yaml
-python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py evolve --generate
 ```
 
-또는 슬래시 커맨드로:
+또는 슬래시 커맨드로 (staged 목록 확인 + apply 안내):
 
 ```
 /evolve
@@ -129,7 +135,8 @@ python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py 
 └── evolved/
     ├── skills/
     ├── commands/
-    └── agents/
+    ├── agents/
+    └── rules/
 ```
 
 ## 설정

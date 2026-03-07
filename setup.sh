@@ -42,6 +42,7 @@ mkdir -p \
   "$HOMUNCULUS_DIR/evolved/skills" \
   "$HOMUNCULUS_DIR/evolved/commands" \
   "$HOMUNCULUS_DIR/evolved/agents" \
+  "$HOMUNCULUS_DIR/evolved/rules" \
   "$HOMUNCULUS_DIR/observations.archive"
 
 touch "$HOMUNCULUS_DIR/observations.jsonl"
@@ -141,14 +142,15 @@ echo ""
 echo "  동작 방식:"
 echo "  • 세션 중: 모든 툴 호출이 자동으로 기록됩니다"
 echo "  • 세션 종료 시: Claude Haiku가 패턴을 분석하고 instinct를 생성합니다"
-echo "  • instinct 생성 후: 자동으로 evolve 실행 → skills/commands/agents 생성"
+echo "  • instinct 생성 후: 자동으로 evolve 실행 → skills/commands/agents/rules 스테이징"
 echo ""
 echo "  슬래시 커맨드:"
-echo "  /evolve          — 수동으로 즉시 evolve 실행"
+echo "  /evolve          — staged 항목 확인 후 선택 적용"
 echo ""
 echo "  CLI 사용법:"
 echo "  python3 $SKILL_DIR/scripts/instinct-cli.py status"
-echo "  python3 $SKILL_DIR/scripts/instinct-cli.py evolve --generate"
+echo "  python3 $SKILL_DIR/scripts/instinct-cli.py apply          # staged 항목 선택 적용"
+echo "  python3 $SKILL_DIR/scripts/instinct-cli.py apply --list   # 목록만 보기"
 echo "  python3 $SKILL_DIR/scripts/instinct-cli.py export -o my-profile.yaml"
 echo ""
 echo "  데이터 위치: ~/.claude/homunculus/"
