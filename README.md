@@ -60,6 +60,10 @@ Stop 훅이 세션 종료를 감지하면 `analyze-on-stop.sh`가 실행된다. 
 
 24/7 백그라운드 데몬 없음 — 일하지 않는 시간엔 아무것도 실행되지 않는다.
 
+### 3. 자동 Evolve (세션 종료 시, instinct 생성 직후)
+
+instinct 분석 완료 후 자동으로 `evolve --generate`가 실행된다. Claude Haiku가 의미론적으로 관련 instinct들을 클러스터링하여 skill/command/agent 파일을 생성한다.
+
 ### 3. Instinct 파일
 
 ```yaml
@@ -91,6 +95,12 @@ python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py 
 python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py export -o my-instincts.yaml
 python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py import friend-instincts.yaml
 python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py evolve --generate
+```
+
+또는 슬래시 커맨드로:
+
+```
+/evolve
 ```
 
 ## 파일 구조
@@ -133,11 +143,18 @@ python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py 
     "model": "haiku",
     "trigger_mode": "session_end",
     "min_observations_to_analyze": 20
+  },
+  "evolution": {
+    "cluster_threshold": 3,
+    "evolved_path": "~/.claude/homunculus/evolved/",
+    "auto_evolve": true
   }
 }
 ```
 
 `min_observations_to_analyze` — 이 수치 미만이면 분석 스킵. 짧은 세션에서 노이즈 방지.
+
+`auto_evolve` — `true`면 instinct 생성 후 자동으로 evolve까지 실행. 기본값 `true`.
 
 ## Confidence 기준
 

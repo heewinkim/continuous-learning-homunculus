@@ -347,6 +347,99 @@ def cmd_export(args):
 
 
 # ─────────────────────────────────────────────
+# Claude Semantic Clustering
+# ─────────────────────────────────────────────
+
+def _claude_cluster_instincts(instincts: list) -> list:
+    """Use Claude Haiku to semantically cluster instincts."""
+    import subprocess
+
+    if not instincts:
+        return []
+
+    lines = []
+    for inst in instincts:
+        lines.append(
+            f"- id: {inst.get('id')}, domain: {inst.get('domain', 'general')}, "
+            f"confidence: {inst.get('confidence', 0.5):.2f}, trigger: {inst.get('trigger', '')}"
+        )
+    instinct_list = '\n'.join(lines)
+
+    prompt = f"""Analyze these learned instincts and group semantically related ones into clusters.
+
+INSTINCTS:
+{instinct_list}
+
+Group instincts into clusters where each cluster:
+- Contains 2+ thematically related instincts
+- Would form a cohesive skill, command, or agent
+- Has a clear unified purpose
+
+Output ONLY valid JSON (no markdown, no explanation):
+{{
+  "clusters": [
+    {{
+      "name": "kebab-case-name",
+      "theme": "one sentence describing what this cluster is about",
+      "type": "skill|command|agent",
+      "instinct_ids": ["id1", "id2"]
+    }}
+  ]
+}}
+
+type rules:
+- skill: reusable knowledge/approach pattern (2+ instincts)
+- command: a workflow that can be invoked as a slash command
+- agent: complex specialization requiring 3+ high-confidence instincts
+
+If no meaningful clusters exist, return {{"clusters": []}}"""
+
+    env = {**os.environ}
+    env.pop('CLAUDECODE', None)
+
+    try:
+        result = subprocess.run(
+            ['claude', '--model', 'haiku', '--max-turns', '1', '--print', prompt],
+            capture_output=True, text=True, env=env, timeout=60
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        print(f"Warning: Claude unavailable ({e})", file=sys.stderr)
+        return []
+
+    if result.returncode != 0:
+        print(f"Warning: Claude error: {result.stderr[:200]}", file=sys.stderr)
+        return []
+
+    output = result.stdout.strip()
+    json_match = re.search(r'\{[\s\S]*\}', output)
+    if not json_match:
+        print(f"Warning: No JSON in Claude output", file=sys.stderr)
+        return []
+
+    try:
+        data = json.loads(json_match.group())
+    except json.JSONDecodeError as e:
+        print(f"Warning: JSON parse error: {e}", file=sys.stderr)
+        return []
+
+    id_to_inst = {i.get('id'): i for i in instincts}
+    clusters = []
+    for cluster in data.get('clusters', []):
+        resolved = [id_to_inst[iid] for iid in cluster.get('instinct_ids', []) if iid in id_to_inst]
+        if len(resolved) < 2:
+            continue
+        clusters.append({
+            'name': cluster.get('name', 'unnamed'),
+            'theme': cluster.get('theme', ''),
+            'type': cluster.get('type', 'skill'),
+            'instincts': resolved,
+            'avg_confidence': sum(i.get('confidence', 0.5) for i in resolved) / len(resolved),
+        })
+
+    return clusters
+
+
+# ─────────────────────────────────────────────
 # Evolve Command
 # ─────────────────────────────────────────────
 
@@ -363,95 +456,125 @@ def cmd_evolve(args):
     print(f"  EVOLVE ANALYSIS - {len(instincts)} instincts")
     print(f"{'='*60}\n")
 
-    # Group by domain
-    by_domain = defaultdict(list)
-    for inst in instincts:
-        domain = inst.get('domain', 'general')
-        by_domain[domain].append(inst)
-
-    # High-confidence instincts by domain (candidates for skills)
     high_conf = [i for i in instincts if i.get('confidence', 0) >= 0.8]
     print(f"High confidence instincts (>=80%): {len(high_conf)}")
 
-    # Find clusters (instincts with similar triggers)
-    trigger_clusters = defaultdict(list)
-    for inst in instincts:
-        trigger = inst.get('trigger', '')
-        # Normalize trigger
-        trigger_key = trigger.lower()
-        for keyword in ['when', 'creating', 'writing', 'adding', 'implementing', 'testing']:
-            trigger_key = trigger_key.replace(keyword, '').strip()
-        trigger_clusters[trigger_key].append(inst)
+    print("\nClaude Haiku로 의미론적 클러스터링 중...")
+    clusters = _claude_cluster_instincts(instincts)
 
-    # Find clusters with 3+ instincts (good skill candidates)
-    skill_candidates = []
-    for trigger, cluster in trigger_clusters.items():
-        if len(cluster) >= 2:
-            avg_conf = sum(i.get('confidence', 0.5) for i in cluster) / len(cluster)
-            skill_candidates.append({
-                'trigger': trigger,
-                'instincts': cluster,
-                'avg_confidence': avg_conf,
-                'domains': list(set(i.get('domain', 'general') for i in cluster))
-            })
+    print(f"\nSemantic clusters found: {len(clusters)}")
 
-    # Sort by cluster size and confidence
-    skill_candidates.sort(key=lambda x: (-len(x['instincts']), -x['avg_confidence']))
+    if clusters:
+        skill_clusters = [c for c in clusters if c['type'] == 'skill']
+        cmd_clusters = [c for c in clusters if c['type'] == 'command']
+        agent_clusters = [c for c in clusters if c['type'] == 'agent']
 
-    print(f"\nPotential skill clusters found: {len(skill_candidates)}")
+        if skill_clusters:
+            print(f"\n## SKILL CANDIDATES ({len(skill_clusters)})\n")
+            for i, c in enumerate(skill_clusters, 1):
+                print(f"{i}. {c['name']}")
+                print(f"   Theme: {c['theme']}")
+                print(f"   Instincts ({len(c['instincts'])}): {', '.join(inst.get('id') for inst in c['instincts'])}")
+                print(f"   Avg confidence: {c['avg_confidence']:.0%}")
+                print()
 
-    if skill_candidates:
-        print(f"\n## SKILL CANDIDATES\n")
-        for i, cand in enumerate(skill_candidates[:5], 1):
-            print(f"{i}. Cluster: \"{cand['trigger']}\"")
-            print(f"   Instincts: {len(cand['instincts'])}")
-            print(f"   Avg confidence: {cand['avg_confidence']:.0%}")
-            print(f"   Domains: {', '.join(cand['domains'])}")
-            print(f"   Instincts:")
-            for inst in cand['instincts'][:3]:
-                print(f"     - {inst.get('id')}")
-            print()
+        if cmd_clusters:
+            print(f"\n## COMMAND CANDIDATES ({len(cmd_clusters)})\n")
+            for c in cmd_clusters:
+                print(f"  /{c['name']}")
+                print(f"   Theme: {c['theme']}")
+                print(f"   Instincts: {', '.join(inst.get('id') for inst in c['instincts'])}")
+                print()
 
-    # Command candidates (workflow instincts with high confidence)
-    workflow_instincts = [i for i in instincts if i.get('domain') == 'workflow' and i.get('confidence', 0) >= 0.7]
-    if workflow_instincts:
-        print(f"\n## COMMAND CANDIDATES ({len(workflow_instincts)})\n")
-        for inst in workflow_instincts[:5]:
-            trigger = inst.get('trigger', 'unknown')
-            # Suggest command name
-            cmd_name = trigger.replace('when ', '').replace('implementing ', '').replace('a ', '')
-            cmd_name = cmd_name.replace(' ', '-')[:20]
-            print(f"  /{cmd_name}")
-            print(f"    From: {inst.get('id')}")
-            print(f"    Confidence: {inst.get('confidence', 0.5):.0%}")
-            print()
-
-    # Agent candidates (complex multi-step patterns)
-    agent_candidates = [c for c in skill_candidates if len(c['instincts']) >= 3 and c['avg_confidence'] >= 0.75]
-    if agent_candidates:
-        print(f"\n## AGENT CANDIDATES ({len(agent_candidates)})\n")
-        for cand in agent_candidates[:3]:
-            agent_name = cand['trigger'].replace(' ', '-')[:20] + '-agent'
-            print(f"  {agent_name}")
-            print(f"    Covers {len(cand['instincts'])} instincts")
-            print(f"    Avg confidence: {cand['avg_confidence']:.0%}")
-            print()
+        if agent_clusters:
+            print(f"\n## AGENT CANDIDATES ({len(agent_clusters)})\n")
+            for c in agent_clusters:
+                print(f"  {c['name']}-agent")
+                print(f"   Theme: {c['theme']}")
+                print(f"   Covers {len(c['instincts'])} instincts, avg confidence: {c['avg_confidence']:.0%}")
+                print()
 
     if args.generate:
-        generated = _generate_evolved(skill_candidates, workflow_instincts, agent_candidates)
-        if generated:
-            print(f"\n✅ Generated {len(generated)} evolved structures:")
-            for path in generated:
-                print(f"   {path}")
+        if not clusters:
+            print("\nNo clusters to generate from.")
         else:
-            print("\nNo structures generated (need higher-confidence clusters).")
+            generated = _generate_evolved_v2(clusters)
+            if generated:
+                print(f"\nGenerated {len(generated)} evolved structures:")
+                for path in generated:
+                    print(f"   {path}")
+            else:
+                print("\nNo structures generated (need higher-confidence clusters).")
 
     print(f"\n{'='*60}\n")
     return 0
 
 
 # ─────────────────────────────────────────────
-# Generate Evolved Structures
+# Generate Evolved Structures (v2 - semantic clusters)
+# ─────────────────────────────────────────────
+
+def _generate_evolved_v2(clusters: list) -> list[str]:
+    """Generate skill/command/agent files from semantic clusters."""
+    generated = []
+
+    for cluster in clusters:
+        name = re.sub(r'[^a-z0-9]+', '-', cluster['name'].lower()).strip('-')[:30]
+        if not name:
+            continue
+        ctype = cluster['type']
+        theme = cluster['theme']
+        inst_list = cluster['instincts']
+        avg_conf = cluster['avg_confidence']
+
+        if ctype == 'skill':
+            skill_dir = EVOLVED_DIR / "skills" / name
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            content = f"---\nname: {name}\ndescription: {theme}\n---\n\n"
+            content += f"# {name}\n\n{theme}\n\n"
+            content += f"Evolved from {len(inst_list)} instincts (avg confidence: {avg_conf:.0%})\n\n"
+            content += "## When to Apply\n\n"
+            for inst in inst_list:
+                content += f"- {inst.get('trigger', inst.get('id'))}\n"
+            content += "\n## Actions\n\n"
+            for inst in inst_list:
+                inst_content = inst.get('content', '')
+                practice = re.search(r'## In Practice\s*\n\s*(.+?)(?:\n\n|\n##|$)', inst_content, re.DOTALL)
+                action = re.search(r'## Action\s*\n\s*(.+?)(?:\n\n|\n##|$)', inst_content, re.DOTALL)
+                m = practice or action
+                text = m.group(1).strip().split('\n')[0] if m else inst.get('id', 'unnamed')
+                content += f"- **{inst.get('id')}**: {text[:80]}\n"
+            path = skill_dir / "SKILL.md"
+            path.write_text(content)
+            generated.append(str(path))
+
+        elif ctype == 'command':
+            cmd_file = EVOLVED_DIR / "commands" / f"{name}.md"
+            content = f"# {name}\n\n{theme}\n\nConfidence: {avg_conf:.0%}\n\n"
+            for inst in inst_list:
+                content += f"## {inst.get('id', 'unnamed')}\n\n"
+                content += inst.get('content', '') + "\n\n"
+            cmd_file.write_text(content)
+            generated.append(str(cmd_file))
+
+        elif ctype == 'agent':
+            agent_file = EVOLVED_DIR / "agents" / f"{name}.md"
+            domains = ', '.join(set(i.get('domain', 'general') for i in inst_list))
+            content = "---\nmodel: sonnet\ntools: Read, Grep, Glob, Edit, Bash\n---\n\n"
+            content += f"# {name}\n\n{theme}\n\n"
+            content += f"Evolved from {len(inst_list)} instincts (avg confidence: {avg_conf:.0%})\n"
+            content += f"Domains: {domains}\n\n"
+            content += "## Source Instincts\n\n"
+            for inst in inst_list:
+                content += f"- **{inst.get('id')}**: {inst.get('trigger', '')}\n"
+            agent_file.write_text(content)
+            generated.append(str(agent_file))
+
+    return generated
+
+
+# ─────────────────────────────────────────────
+# Generate Evolved Structures (legacy)
 # ─────────────────────────────────────────────
 
 def _generate_evolved(skill_candidates: list, workflow_instincts: list, agent_candidates: list) -> list[str]:

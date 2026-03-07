@@ -24,7 +24,8 @@ An advanced learning system that turns your Claude Code sessions into reusable k
 | Analysis | Main context | Background agent (Haiku) |
 | Granularity | Full skills | Atomic "instincts" |
 | Confidence | None | 0.3-0.9 weighted |
-| Evolution | Direct to skill | Instincts → cluster → skill/command/agent |
+| Clustering | String matching | Claude Haiku semantic clustering |
+| Evolution | Manual | Auto on session end (auto_evolve: true) |
 | Sharing | None | Export/import instincts |
 
 ## The Instinct Model
@@ -161,7 +162,7 @@ touch ~/.claude/homunculus/observations.jsonl
 
 ```bash
 /instinct-status     # Show learned instincts with confidence scores
-/evolve              # Cluster related instincts into skills/commands
+/evolve              # Semantically cluster instincts (Claude Haiku) into skills/commands/agents
 /instinct-export     # Export instincts for sharing
 /instinct-import     # Import instincts from others
 ```

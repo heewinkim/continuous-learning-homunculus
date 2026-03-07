@@ -38,7 +38,7 @@
   "evolution": {
     "cluster_threshold": 3,
     "evolved_path": "~/.claude/homunculus/evolved/",
-    "auto_evolve": false
+    "auto_evolve": true
   },
   "integration": {
     "skill_creator_api": "https://skill-creator.app/api",

@@ -198,6 +198,15 @@ if [ $parse_exit -eq 0 ]; then
   mkdir -p "$archive_dir"
   mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S).jsonl" 2>/dev/null || true
   touch "$OBSERVATIONS_FILE"
+
+  # Auto-evolve: cluster instincts into skills/commands/agents
+  SKILL_DIR="$(dirname "$(dirname "$0")")"
+  CLI_SCRIPT="${SKILL_DIR}/scripts/instinct-cli.py"
+  if [ -f "$CLI_SCRIPT" ]; then
+    echo "[$(date)] Running auto-evolve..." >> "$LOG_FILE"
+    EVOLVE_OUTPUT=$(python3 "$CLI_SCRIPT" evolve --generate 2>&1)
+    echo "[$(date)] Evolve complete: $EVOLVE_OUTPUT" >> "$LOG_FILE"
+  fi
 else
   echo "[$(date)] Parse failed. Raw output: ${ANALYSIS_OUTPUT:0:500}" >> "$LOG_FILE"
 fi
