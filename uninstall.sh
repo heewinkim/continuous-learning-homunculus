@@ -64,6 +64,14 @@ else
   echo -e "${YELLOW}!${NC} settings.json 없음, 스킵"
 fi
 
+# ── Remove slash commands ──────────────────────────────────────────────────
+
+COMMANDS_DIR="${HOME}/.claude/commands"
+if [ -f "$COMMANDS_DIR/evolve.md" ]; then
+  rm "$COMMANDS_DIR/evolve.md"
+  echo -e "${GREEN}✓${NC} /evolve 슬래시 커맨드 제거 완료"
+fi
+
 # ── Ask about data ─────────────────────────────────────────────────────────
 
 echo ""

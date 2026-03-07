@@ -117,6 +117,21 @@ PYEOF
 
 ok "~/.claude/settings.json 훅 등록 완료 (PreToolUse, PostToolUse, Stop)"
 
+# ── Register slash commands ─────────────────────────────────────────────────
+
+COMMANDS_DIR="${HOME}/.claude/commands"
+mkdir -p "$COMMANDS_DIR"
+
+EVOLVE_SRC="$SKILL_DIR/commands/evolve.md"
+EVOLVE_DST="$COMMANDS_DIR/evolve.md"
+
+if [ -f "$EVOLVE_SRC" ]; then
+  cp "$EVOLVE_SRC" "$EVOLVE_DST"
+  ok "/evolve 슬래시 커맨드 등록 완료 (~/.claude/commands/evolve.md)"
+else
+  warn "/evolve 커맨드 소스를 찾을 수 없습니다: $EVOLVE_SRC"
+fi
+
 # ── Done ───────────────────────────────────────────────────────────────────
 
 echo ""
@@ -126,9 +141,14 @@ echo ""
 echo "  동작 방식:"
 echo "  • 세션 중: 모든 툴 호출이 자동으로 기록됩니다"
 echo "  • 세션 종료 시: Claude Haiku가 패턴을 분석하고 instinct를 생성합니다"
+echo "  • instinct 생성 후: 자동으로 evolve 실행 → skills/commands/agents 생성"
+echo ""
+echo "  슬래시 커맨드:"
+echo "  /evolve          — 수동으로 즉시 evolve 실행"
 echo ""
 echo "  CLI 사용법:"
 echo "  python3 $SKILL_DIR/scripts/instinct-cli.py status"
+echo "  python3 $SKILL_DIR/scripts/instinct-cli.py evolve --generate"
 echo "  python3 $SKILL_DIR/scripts/instinct-cli.py export -o my-profile.yaml"
 echo ""
 echo "  데이터 위치: ~/.claude/homunculus/"
