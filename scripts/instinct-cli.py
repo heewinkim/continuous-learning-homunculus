@@ -4,9 +4,9 @@ Instinct CLI - Manage instincts for Continuous Learning v2
 
 Commands:
   status   - Show all instincts and their status
-  import   - Import instincts from file or URL
   export   - Export instincts to file
   evolve   - Cluster instincts into skills/commands/agents
+  apply    - Selectively apply evolved items to ~/.claude/
 """
 
 import argparse
@@ -14,7 +14,6 @@ import json
 import os
 import sys
 import re
-import urllib.request
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
@@ -27,14 +26,13 @@ from typing import Optional
 HOMUNCULUS_DIR = Path.home() / ".claude" / "homunculus"
 INSTINCTS_DIR = HOMUNCULUS_DIR / "instincts"
 PERSONAL_DIR = INSTINCTS_DIR / "personal"
-INHERITED_DIR = INSTINCTS_DIR / "inherited"
 EVOLVED_DIR = HOMUNCULUS_DIR / "evolved"
 OBSERVATIONS_FILE = HOMUNCULUS_DIR / "observations.jsonl"
 
 CLAUDE_RULES_DIR = Path.home() / ".claude" / "rules"
 
 # Ensure directories exist
-for d in [PERSONAL_DIR, INHERITED_DIR, EVOLVED_DIR / "skills", EVOLVED_DIR / "commands", EVOLVED_DIR / "agents", EVOLVED_DIR / "rules"]:
+for d in [PERSONAL_DIR, EVOLVED_DIR / "skills", EVOLVED_DIR / "commands", EVOLVED_DIR / "agents", EVOLVED_DIR / "rules"]:
     d.mkdir(parents=True, exist_ok=True)
 
 
@@ -84,27 +82,26 @@ def parse_instinct_file(content: str) -> list[dict]:
 
 
 def load_all_instincts() -> list[dict]:
-    """Load all instincts from personal and inherited directories."""
+    """Load all instincts from personal directory."""
     instincts = []
 
-    for directory in [PERSONAL_DIR, INHERITED_DIR]:
-        if not directory.exists():
-            continue
-        yaml_files = sorted(
-            set(directory.glob("*.yaml"))
-            | set(directory.glob("*.yml"))
-            | set(directory.glob("*.md"))
-        )
-        for file in yaml_files:
-            try:
-                content = file.read_text()
-                parsed = parse_instinct_file(content)
-                for inst in parsed:
-                    inst['_source_file'] = str(file)
-                    inst['_source_type'] = directory.name
-                instincts.extend(parsed)
-            except Exception as e:
-                print(f"Warning: Failed to parse {file}: {e}", file=sys.stderr)
+    if not PERSONAL_DIR.exists():
+        return instincts
+
+    yaml_files = sorted(
+        set(PERSONAL_DIR.glob("*.yaml"))
+        | set(PERSONAL_DIR.glob("*.yml"))
+        | set(PERSONAL_DIR.glob("*.md"))
+    )
+    for file in yaml_files:
+        try:
+            content = file.read_text()
+            parsed = parse_instinct_file(content)
+            for inst in parsed:
+                inst['_source_file'] = str(file)
+            instincts.extend(parsed)
+        except Exception as e:
+            print(f"Warning: Failed to parse {file}: {e}", file=sys.stderr)
 
     return instincts
 
@@ -135,11 +132,7 @@ def cmd_status(args):
     print(f"  INSTINCT STATUS - {len(instincts)} total")
     print(f"{'='*60}\n")
 
-    # Summary by source
-    personal = [i for i in instincts if i.get('_source_type') == 'personal']
-    inherited = [i for i in instincts if i.get('_source_type') == 'inherited']
-    print(f"  Personal:  {len(personal)}")
-    print(f"  Inherited: {len(inherited)}")
+    print(f"  Personal: {len(instincts)}")
     print()
 
     # Print by domain
@@ -175,128 +168,6 @@ def cmd_status(args):
 
     print(f"\n{'='*60}\n")
 
-
-# ─────────────────────────────────────────────
-# Import Command
-# ─────────────────────────────────────────────
-
-def cmd_import(args):
-    """Import instincts from file or URL."""
-    source = args.source
-
-    # Fetch content
-    if source.startswith('http://') or source.startswith('https://'):
-        print(f"Fetching from URL: {source}")
-        try:
-            with urllib.request.urlopen(source) as response:
-                content = response.read().decode('utf-8')
-        except Exception as e:
-            print(f"Error fetching URL: {e}", file=sys.stderr)
-            return 1
-    else:
-        path = Path(source).expanduser()
-        if not path.exists():
-            print(f"File not found: {path}", file=sys.stderr)
-            return 1
-        content = path.read_text()
-
-    # Parse instincts
-    new_instincts = parse_instinct_file(content)
-    if not new_instincts:
-        print("No valid instincts found in source.")
-        return 1
-
-    print(f"\nFound {len(new_instincts)} instincts to import.\n")
-
-    # Load existing
-    existing = load_all_instincts()
-    existing_ids = {i.get('id') for i in existing}
-
-    # Categorize
-    to_add = []
-    duplicates = []
-    to_update = []
-
-    for inst in new_instincts:
-        inst_id = inst.get('id')
-        if inst_id in existing_ids:
-            # Check if we should update
-            existing_inst = next((e for e in existing if e.get('id') == inst_id), None)
-            if existing_inst:
-                if inst.get('confidence', 0) > existing_inst.get('confidence', 0):
-                    to_update.append(inst)
-                else:
-                    duplicates.append(inst)
-        else:
-            to_add.append(inst)
-
-    # Filter by minimum confidence
-    min_conf = args.min_confidence or 0.0
-    to_add = [i for i in to_add if i.get('confidence', 0.5) >= min_conf]
-    to_update = [i for i in to_update if i.get('confidence', 0.5) >= min_conf]
-
-    # Display summary
-    if to_add:
-        print(f"NEW ({len(to_add)}):")
-        for inst in to_add:
-            print(f"  + {inst.get('id')} (confidence: {inst.get('confidence', 0.5):.2f})")
-
-    if to_update:
-        print(f"\nUPDATE ({len(to_update)}):")
-        for inst in to_update:
-            print(f"  ~ {inst.get('id')} (confidence: {inst.get('confidence', 0.5):.2f})")
-
-    if duplicates:
-        print(f"\nSKIP ({len(duplicates)} - already exists with equal/higher confidence):")
-        for inst in duplicates[:5]:
-            print(f"  - {inst.get('id')}")
-        if len(duplicates) > 5:
-            print(f"  ... and {len(duplicates) - 5} more")
-
-    if args.dry_run:
-        print("\n[DRY RUN] No changes made.")
-        return 0
-
-    if not to_add and not to_update:
-        print("\nNothing to import.")
-        return 0
-
-    # Confirm
-    if not args.force:
-        response = input(f"\nImport {len(to_add)} new, update {len(to_update)}? [y/N] ")
-        if response.lower() != 'y':
-            print("Cancelled.")
-            return 0
-
-    # Write to inherited directory
-    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-    source_name = Path(source).stem if not source.startswith('http') else 'web-import'
-    output_file = INHERITED_DIR / f"{source_name}-{timestamp}.yaml"
-
-    all_to_write = to_add + to_update
-    output_content = f"# Imported from {source}\n# Date: {datetime.now().isoformat()}\n\n"
-
-    for inst in all_to_write:
-        output_content += "---\n"
-        output_content += f"id: {inst.get('id')}\n"
-        output_content += f"trigger: \"{inst.get('trigger', 'unknown')}\"\n"
-        output_content += f"confidence: {inst.get('confidence', 0.5)}\n"
-        output_content += f"domain: {inst.get('domain', 'general')}\n"
-        output_content += f"source: inherited\n"
-        output_content += f"imported_from: \"{source}\"\n"
-        if inst.get('source_repo'):
-            output_content += f"source_repo: {inst.get('source_repo')}\n"
-        output_content += "---\n\n"
-        output_content += inst.get('content', '') + "\n\n"
-
-    output_file.write_text(output_content)
-
-    print(f"\n✅ Import complete!")
-    print(f"   Added: {len(to_add)}")
-    print(f"   Updated: {len(to_update)}")
-    print(f"   Saved to: {output_file}")
-
-    return 0
 
 
 # ─────────────────────────────────────────────
@@ -849,13 +720,6 @@ def main():
     # Status
     status_parser = subparsers.add_parser('status', help='Show instinct status')
 
-    # Import
-    import_parser = subparsers.add_parser('import', help='Import instincts')
-    import_parser.add_argument('source', help='File path or URL')
-    import_parser.add_argument('--dry-run', action='store_true', help='Preview without importing')
-    import_parser.add_argument('--force', action='store_true', help='Skip confirmation')
-    import_parser.add_argument('--min-confidence', type=float, help='Minimum confidence threshold')
-
     # Export
     export_parser = subparsers.add_parser('export', help='Export instincts')
     export_parser.add_argument('--output', '-o', help='Output file')
@@ -875,8 +739,6 @@ def main():
 
     if args.command == 'status':
         return cmd_status(args)
-    elif args.command == 'import':
-        return cmd_import(args)
     elif args.command == 'export':
         return cmd_export(args)
     elif args.command == 'evolve':

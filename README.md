@@ -100,7 +100,6 @@ python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py 
 python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py apply --list   # 목록만 보기
 python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py apply --force  # 이미 적용된 것도 재선택
 python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py export -o my-instincts.yaml
-python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py import friend-instincts.yaml
 ```
 
 또는 슬래시 커맨드로 (staged 목록 확인 + apply 안내):
@@ -130,8 +129,7 @@ python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py 
 ├── observations.jsonl
 ├── observations.archive/
 ├── instincts/
-│   ├── personal/               # 자동 학습된 instinct
-│   └── inherited/              # 다른 사람에게서 가져온 instinct
+│   └── personal/               # 자동 학습된 instinct
 └── evolved/
     ├── skills/
     ├── commands/
@@ -172,16 +170,6 @@ python3 ~/.claude/skills/continuous-learning-homunculus/scripts/instinct-cli.py 
 | 0.7 | 반복 확인됨, 적용 고려 |
 | 0.8 | 강한 패턴, 자동 적용 |
 | 0.9+ | 핵심 특성, 거의 확실 |
-
-## Instinct 공유
-
-```bash
-# 내 instinct 내보내기
-python3 scripts/instinct-cli.py export --min-confidence 0.6 -o my-profile.yaml
-
-# 다른 사람 instinct 가져오기
-python3 scripts/instinct-cli.py import https://raw.githubusercontent.com/.../instincts.yaml
-```
 
 ## 프라이버시
 

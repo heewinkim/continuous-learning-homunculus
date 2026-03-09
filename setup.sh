@@ -38,7 +38,6 @@ ok "스크립트 실행 권한 설정 완료"
 
 mkdir -p \
   "$HOMUNCULUS_DIR/instincts/personal" \
-  "$HOMUNCULUS_DIR/instincts/inherited" \
   "$HOMUNCULUS_DIR/evolved/skills" \
   "$HOMUNCULUS_DIR/evolved/commands" \
   "$HOMUNCULUS_DIR/evolved/agents" \
