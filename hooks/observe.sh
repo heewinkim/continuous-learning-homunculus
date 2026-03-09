@@ -119,6 +119,8 @@ if [ -f "$OBSERVATIONS_FILE" ]; then
     archive_dir="${CONFIG_DIR}/observations.archive"
     mkdir -p "$archive_dir"
     mv "$OBSERVATIONS_FILE" "$archive_dir/observations-$(date +%Y%m%d-%H%M%S).jsonl"
+    # Reset line counter since file was re-created
+    rm -f "${CONFIG_DIR}/.last_analyzed"
   fi
 fi
 

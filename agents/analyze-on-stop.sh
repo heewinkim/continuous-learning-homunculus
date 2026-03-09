@@ -25,23 +25,25 @@ if [ ! -f "$OBSERVATIONS_FILE" ]; then
   exit 0
 fi
 
-obs_count=$(wc -l < "$OBSERVATIONS_FILE" 2>/dev/null | tr -d ' ' || echo 0)
-if [ "$obs_count" -lt "$MIN_OBSERVATIONS" ]; then
-  echo "[$(date)] Skipped: only $obs_count observations (min: $MIN_OBSERVATIONS)" >> "$LOG_FILE"
-  exit 0
-fi
+total_lines=$(wc -l < "$OBSERVATIONS_FILE" 2>/dev/null | tr -d ' ' || echo 0)
 
-# Check if there are new observations since last analysis
+# Track last analyzed line number (not timestamp)
+LAST_LINE=0
 if [ -f "$LAST_ANALYZED_FILE" ]; then
-  last_analyzed=$(cat "$LAST_ANALYZED_FILE")
-  obs_modified=$(stat -f "%m" "$OBSERVATIONS_FILE" 2>/dev/null || stat -c "%Y" "$OBSERVATIONS_FILE" 2>/dev/null || echo 0)
-  if [ "$obs_modified" -le "$last_analyzed" ]; then
-    echo "[$(date)] Skipped: no new observations since last analysis" >> "$LOG_FILE"
-    exit 0
+  LAST_LINE=$(cat "$LAST_ANALYZED_FILE" 2>/dev/null | tr -d ' ' || echo 0)
+  # Reset if file was re-created (line count went backwards)
+  if [ "$LAST_LINE" -gt "$total_lines" ]; then
+    LAST_LINE=0
   fi
 fi
 
-echo "[$(date)] Session ended. Analyzing $obs_count observations..." >> "$LOG_FILE"
+new_lines=$((total_lines - LAST_LINE))
+if [ "$new_lines" -lt "$MIN_OBSERVATIONS" ]; then
+  echo "[$(date)] Skipped: only $new_lines new observations (min: $MIN_OBSERVATIONS)" >> "$LOG_FILE"
+  exit 0
+fi
+
+echo "[$(date)] Session ended. Analyzing $new_lines new observations (lines $((LAST_LINE+1))-$total_lines)..." >> "$LOG_FILE"
 
 # Run Claude Haiku analysis
 if ! command -v claude &> /dev/null; then
@@ -49,8 +51,8 @@ if ! command -v claude &> /dev/null; then
   exit 1
 fi
 
-# Read observations content directly (avoid needing Read tool permission)
-OBS_CONTENT=$(head -c 40000 "$OBSERVATIONS_FILE" 2>/dev/null)
+# Read only NEW observations since last analysis
+OBS_CONTENT=$(tail -n +"$((LAST_LINE + 1))" "$OBSERVATIONS_FILE" | head -c 40000 2>/dev/null)
 TODAY=$(date +%Y-%m-%d)
 
 # Build existing instincts summary with full content for merging decisions
@@ -152,11 +154,7 @@ fi
 # Check if no instincts found
 if echo "$ANALYSIS_OUTPUT" | grep -q "^NO_INSTINCTS"; then
   echo "[$(date)] No qualifying instincts found." >> "$LOG_FILE"
-  date +%s > "$LAST_ANALYZED_FILE"
-  archive_dir="${CONFIG_DIR}/observations.archive"
-  mkdir -p "$archive_dir"
-  mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S).jsonl" 2>/dev/null || true
-  touch "$OBSERVATIONS_FILE"
+  echo "$total_lines" > "$LAST_ANALYZED_FILE"
   exit 0
 fi
 
@@ -192,21 +190,8 @@ parse_exit=$?
 echo "[$(date)] $FILES_WRITTEN" >> "$LOG_FILE"
 
 if [ $parse_exit -eq 0 ]; then
-  echo "[$(date)] Analysis complete." >> "$LOG_FILE"
-  date +%s > "$LAST_ANALYZED_FILE"
-  archive_dir="${CONFIG_DIR}/observations.archive"
-  mkdir -p "$archive_dir"
-  mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S).jsonl" 2>/dev/null || true
-  touch "$OBSERVATIONS_FILE"
-
-  # Auto-evolve: cluster instincts into skills/commands/agents
-  SKILL_DIR="$(dirname "$(dirname "$0")")"
-  CLI_SCRIPT="${SKILL_DIR}/scripts/instinct-cli.py"
-  if [ -f "$CLI_SCRIPT" ]; then
-    echo "[$(date)] Running auto-evolve..." >> "$LOG_FILE"
-    EVOLVE_OUTPUT=$(python3 "$CLI_SCRIPT" evolve --generate 2>&1)
-    echo "[$(date)] Evolve complete: $EVOLVE_OUTPUT" >> "$LOG_FILE"
-  fi
+  echo "[$(date)] Analysis complete. Marked line $total_lines as analyzed." >> "$LOG_FILE"
+  echo "$total_lines" > "$LAST_ANALYZED_FILE"
 else
   echo "[$(date)] Parse failed. Raw output: ${ANALYSIS_OUTPUT:0:500}" >> "$LOG_FILE"
 fi
